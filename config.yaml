@@ -1,0 +1,125 @@
+# AI-Driven Taxi Fleet Management System - configuration
+# Units: distances in km, times in minutes, money in AED.
+
+seed: 0
+device: auto            # auto | cpu | cuda
+paths:
+  data_dir: data
+  output_dir: outputs
+
+data:
+  source: synthetic       # synthetic | nyc_tlc
+  slot_minutes: 15
+  split: [0.7, 0.1, 0.2]  # chronological train / val / test (by day)
+  synthetic:
+    # Dubai-like linear corridor city: cols run along the coast (Jebel Ali -> Airport)
+    grid_rows: 4
+    grid_cols: 10
+    cell_km: 3.0
+    days: 70
+    start_date: "2026-01-05"   # a Monday
+    daily_trips: 36000          # scaled-down Dubai (~308k/day citywide, RTA 2024)
+    event_prob: 0.15            # chance per day of an evening event spike
+    day_noise_sigma: 0.10       # lognormal day-level demand noise
+  nyc_tlc:
+    parquet_glob: data/raw/nyc/*.parquet    # download from the NYC TLC trip record page
+    zone_centroids_csv: data/raw/nyc/zone_centroids.csv  # LocationID,lat,lon
+    knn: 6
+
+forecast:
+  model: gcngru_ae        # ha | last | gcngru | gcngru_ae
+  history: 12             # recent slots (3 h)
+  periodic_days: 3        # same slot on previous days
+  horizon: 4              # predict next 4 slots (1 h)
+  hidden: 64
+  emb_dim: 16
+  epochs: 40
+  batch_size: 64
+  lr: 0.002
+  conformal_alpha: 0.1    # 90% prediction intervals
+
+sim:
+  fleet_size: 1500
+  start_slot: 20          # 05:00
+  episode_slots: 72       # 18 operating hours
+  max_travel_slots: 6
+  base_speed_kmh: 40
+  peak_speed_kmh: 24
+  detour_factor: 1.25
+  idle_cruise_km: 1.5     # km an idle taxi cruises per slot while unassigned
+  neighbor_matching: true # unmet requests may be served from adjacent zones
+  fare_flag: 12.0
+  fare_per_km: 2.0
+  empty_cost_per_km: 0.6
+  rebalance_budget: 0.5   # max fraction of idle fleet moved per slot
+
+control:
+  methods: [none, greedy, lp, lp_robust, bilevel_rl, meanfield_rl, oracle_lp]
+  rl:
+    hidden: 64
+    episodes: 150
+    bc_epochs: 25         # behaviour-cloning warm start; 150 epochs overfit (val profit 781k vs 817k)
+    lr: 0.00003
+    critic_warmup: 25     # episodes of critic-only updates after the warm start
+    gamma: 0.97
+    gae_lambda: 0.95
+    entropy_coef: 0.0     # >0 shifts the Dirichlet mean and hurt fine-tuning in tests
+    concentration_scale: 30.0
+
+eval:
+  fleet_sweep: [1000, 1500, 2000, 3000]
+
+event_sim:                # vehicle-level validation simulator
+  match_interval_min: 1
+  patience_min: 10        # riders abandon after 10 min without an assigned taxi
+  max_pickup_km: 6.0
+  value_gamma: 0.95       # per-slot discount for value-augmented matching
+  pickup_penalty_aed_per_km: 8.0   # Omega: rider-wait cost per pickup km in the value edge weight
+  matchers: [greedy, hungarian, value]
+  eval_days: 7            # test days replayed vehicle by vehicle
+
+stress:                   # synthetic stress-test days appended after the test period
+  # 3 normal buffer days separate blocks so each block's history inputs are realistic
+  schedule: [ramadan, ramadan, ramadan, ramadan, ramadan, ramadan, ramadan,
+             normal, normal, normal, concert, concert, concert, normal, normal, normal, nye, nye_after]
+  iftar_break_frac: 0.3   # share of idle taxis taking a 1-hour iftar break at 18:30 (assumption)
+  nye_start_slot: 40      # NYE episodes run 10:00 -> 04:00 to cover the post-midnight egress
+
+dfl:                      # decision-focused fine-tuning of the forecaster through the LP
+  lr: 0.0002
+  batch_size: 16
+  epochs: 5
+  steps_per_epoch: 60
+  sigma: 0.5              # perturbation scale, multiplied by sqrt(forecast) (Poisson-like)
+  samples: 4              # antithetic perturbation pairs per sample
+  beta: 0.01              # weight of the decision surrogate relative to MAE
+
+transfer:                 # NYC TLC -> Dubai-like city
+  source_months: [2024-01, 2024-02, 2024-03]
+  k_eig: 8
+  hidden: 64
+  lr: 0.001
+  pretrain_epochs: 25
+  finetune_epochs: 20
+  few_shot_days: [3, 7]
+
+sumo:                     # microscopic validation in SUMO (pip install eclipse-sumo traci sumolib)
+  block_m: 1000           # grid block length
+  speed_ms: 13.89         # 50 km/h
+  test_day_index: 0
+  start_slot: 28          # 07:00
+  slots: 8                # 2-hour morning peak window
+  scale: 0.25             # demand scaled to keep SUMO fast
+  fleet_scale: 0.25       # default fleet = sim.fleet_size x fleet_scale (used when fleet_sweep is empty)
+  fleet_sweep: [150, 200, 250, 300]   # absolute taxi counts, each run on the same rider stream
+  windows: [[28, 8], [68, 12]]        # (start_slot, slots): 07:00-09:00 and 17:00-20:00
+  network: grid           # grid (netgenerate) | osm (real Dubai roads, see src/simulation/osm_map.py)
+  osm:
+    origin: [25.080, 55.135]          # lat, lon of zone column 0 (Dubai Marina)
+    toward: [25.265, 55.320]          # corridor axis heads toward Deira along Sheikh Zayed Road
+  gui_3d: false           # --gui also opens a 3D (OpenSceneGraph) view
+  step_s: 1
+  dispatch_period_s: 30
+  decision_period_s: 300  # rebalancing decisions every 5 min (receding horizon on the 15-min forecast); ablation: 900 -> 300 doubles the wait gain
+  lp_cost: traveltime     # LP move cost: traveltime (fastest SUMO route, cached per network) | distance (zone centroids)
+  matcher: hungarian      # hungarian | value (value-aware; mixed results in the ablation, see outputs/sumo_ablation.md)

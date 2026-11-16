@@ -1,0 +1,11 @@
+secrets/
+data/
+data_z160/
+external/
+outputs/
+outputs_z160/
+__pycache__/
+*.pt
+*.npz
+*.key
+.venv/

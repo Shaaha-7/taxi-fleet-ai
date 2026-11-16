@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dubai AI Taxi Photoreal</title>
+<link href="https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #05080c; overflow: hidden; }
+  #map { position: absolute; inset: 0; }
+  #dir { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: Montserrat, system-ui, sans-serif; color: #fff; }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,.35) 100%),
+              linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 28%), linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,0) 14%); }
+  .letterbox { position: absolute; left: 0; right: 0; height: 0; background: #000; }
+  .lb-top { top: 0; } .lb-bot { bottom: 0; }
+  .brand { position: absolute; left: 56px; top: 44px; font-weight: 800; letter-spacing: .2em; font-size: 20px; display: flex; align-items: center; gap: 12px; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  .brand .dot { width: 14px; height: 14px; border-radius: 50%; background: #ffc400; box-shadow: 0 0 0 5px rgba(255,196,0,.25); }
+  .clockchip { position: absolute; right: 56px; top: 36px; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  .clockchip span { font-weight: 800; font-size: 42px; font-variant-numeric: tabular-nums; }
+  .clockchip small { display: block; font-weight: 600; font-size: 15px; letter-spacing: .22em; color: #ffc400; }
+  .title { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+           background: radial-gradient(ellipse 60% 45% at center, rgba(4,8,12,.62), rgba(4,8,12,0) 100%); }
+  .title .kicker { color: #ffc400; font-weight: 600; letter-spacing: .38em; font-size: 19px; margin-bottom: 20px; text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+  .title h1 { margin: 0; font-size: 70px; line-height: 1.1; font-weight: 800; text-shadow: 0 6px 30px rgba(0,0,0,.75); }
+  .title p { margin: 24px 0 0; font-size: 23px; color: #eef2f6; text-shadow: 0 2px 14px rgba(0,0,0,.85); max-width: 1150px; }
+  .lower { position: absolute; left: 56px; bottom: 78px; display: flex; gap: 18px; max-width: 1080px;
+           background: linear-gradient(90deg, rgba(8,12,18,.86), rgba(8,12,18,.62)); padding: 18px 28px 18px 18px; border-radius: 6px; }
+  .lower .bar { width: 6px; border-radius: 3px; background: #ffc400; flex: none; }
+  .lower .h { font-size: 33px; font-weight: 800; line-height: 1.2; }
+  .lower .s { font-size: 19px; color: #d9e0e7; margin-top: 6px; line-height: 1.4; }
+  .step { position: absolute; left: 56px; bottom: 214px; font-weight: 800; font-size: 15px; letter-spacing: .25em; color: #111; background: #ffc400; padding: 6px 12px; border-radius: 4px; }
+  .stats { position: absolute; right: 56px; bottom: 78px; display: flex; gap: 14px; }
+  .stats div { background: rgba(8,12,18,.78); border-radius: 6px; padding: 12px 18px; text-align: center; min-width: 124px; }
+  .stats b { display: block; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #b5c0cb; }
+  .results { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(4,8,12,.42); }
+  .results .rh { font-size: 32px; font-weight: 800; margin-bottom: 36px; text-shadow: 0 3px 18px rgba(0,0,0,.6); }
+  .results .cards { display: flex; gap: 30px; }
+  .results .card { width: 340px; background: rgba(10,15,22,.86); border-top: 5px solid #ffc400; border-radius: 8px; padding: 30px 24px; text-align: center; }
+  .results .card b { display: block; font-size: 72px; font-weight: 800; color: #ffc400; font-variant-numeric: tabular-nums; }
+  .results .card span { display: block; font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .results .card small { display: block; font-size: 16px; color: #b5c0cb; margin-top: 10px; }
+  .results .rf { margin-top: 30px; font-size: 16px; color: #cfd7de; }
+  .credit { position: absolute; right: 56px; bottom: 30px; font-size: 13px; color: rgba(255,255,255,.75); }
+  .tag { position: absolute; transform: translate(-50%, -100%); font: 800 16px Montserrat, sans-serif; padding: 5px 11px; border-radius: 5px; white-space: nowrap;
+         box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  .tag::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: inherit; }
+  .tag.hero { background: #ffc400; color: #111; border-top-color: #ffc400; }
+  .tag.rider { background: #ffe14d; color: #111; border-top-color: #ffe14d; }
+  .tag.drop { background: #e03b3b; color: #fff; border-top-color: #e03b3b; }
+  .zl { position: absolute; transform: translate(-50%, -50%); font: 600 13px Montserrat, sans-serif; color: #fff; background: rgba(8,12,18,.6); padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+  #gcredit { position: fixed; left: 56px; bottom: 14px; z-index: 12; font: 12px Montserrat, sans-serif; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.9); white-space: nowrap; }
+  #gcredit * { display: inline !important; position: static !important; white-space: nowrap; }
+  .lower { bottom: 118px !important; } .stats { bottom: 118px !important; } .step { bottom: 254px !important; }
+  .credit { bottom: 14px !important; }
+  #gcredit img { height: 18px; vertical-align: middle; }
+  #gcredit .cesium-credit-lightbox-overlay, #gcredit .cesium-credit-expand-link { display: none !important; }
+  .cesium-viewer-bottom { display: none; }
+</style>
+</head>
+<body>
+<div id="map"></div><div id="gcredit"></div>
+<div id="dir">
+  <div class="vignette"></div>
+  <div id="labels"></div>
+  <div class="brand"><span class="dot"></span>DUBAI AI TAXI FLEET</div>
+  <div class="clockchip"><span id="dClock">07:00</span><small id="dTag"></small></div>
+  <div class="step" id="dStep"></div>
+  <div class="title" id="dTitle"></div>
+  <div class="lower" id="dLower"><div class="bar"></div><div><div class="h" id="dH"></div><div class="s" id="dS"></div></div></div>
+  <div class="stats" id="dStats"></div>
+  <div class="results" id="dResults"></div>
+  <div class="credit">Simulation: SUMO on OpenStreetMap roads · 3D city: Google</div>
+  <div class="letterbox lb-top" id="lbT"></div><div class="letterbox lb-bot" id="lbB"></div>
+</div>
+<script>window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/";</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/Cesium.js"></script>
+<script src="gkey.js"></script>
+<script src="replay_residual_rl.js"></script>
+<script src="timeline.js"></script>
+<script>
+// ------------------------------------------------------------------ data helpers (same replay format as the viewer)
+const R = window.REPLAY.residual_rl, FPS = 30, HERO = R.taxis.indexOf("taxi1");
+const COL = ["#2ecc71", "#ff9f1a", "#ff3b3b", "#3d8bff"];
+const $ = id => document.getElementById(id);
+const ll = q => [R.lon0 + q[1] / 1e5, R.lat0 + q[0] / 1e5];                     // [lon, lat]
+const clock = t => { const m = Math.floor(R.clock0 + t / 60); return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+function frameAt(t) {
+  let lo = 0, hi = R.times.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (R.times[mid] <= t) lo = mid; else hi = mid - 1; }
+  const k1 = Math.min(lo + 1, R.times.length - 1), span = R.times[k1] - R.times[lo];
+  return [lo, k1, span > 0 ? Math.min(1, Math.max(0, (t - R.times[lo]) / span)) : 0];
+}
+function taxiAt(i, t) {
+  const [k0, k1, f] = frameAt(t), a = R.pos[k0][i], b = R.pos[k1][i] || a;
+  if (!a) return null;
+  const d = ((b[2] - a[2] + 540) % 360) - 180;
+  return { lon: R.lon0 + (a[1] + (b[1] - a[1]) * f) / 1e5, lat: R.lat0 + (a[0] + (b[0] - a[0]) * f) / 1e5, ang: a[2] + d * f, state: R.state[k0][i] };
+}
+const evIdx = R.taxis.map(() => []); for (const e of R.events) evIdx[e[1]].push(e);
+function targetAt(i, t) { let best = null; for (const e of evIdx[i]) { if (e[0] <= t) best = e; else break; } return best && best[2] ? best : null; }
+function decisionAt(t) { let d = null; for (const x of R.decisions) if (x.t <= t) d = x; return d; }
+function smoothHeading(i, t) {                                                   // chase-cam bearing: direction of travel over ±7 s
+  const a = taxiAt(i, t - 7), b = taxiAt(i, t + 7);
+  if (!a || !b) return taxiAt(i, t).ang;
+  const dx = (b.lon - a.lon) * Math.cos(25.2 * Math.PI / 180), dy = b.lat - a.lat;
+  return Math.hypot(dx, dy) < 2e-5 ? taxiAt(i, t).ang : (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+}
+const gapOf = (d, z) => d.hi[z] + d.queue[z] - d.idle[z] - d.arriving[z];
+const seaZone = z => R.names[z].startsWith("Coast") || (z >= 30 && R.names[z].startsWith("near"));
+
+// ------------------------------------------------------------------ Cesium scene (Google Photorealistic 3D Tiles)
+const D2R = Math.PI / 180;
+Cesium.Ion.defaultAccessToken = "";
+const viewer = new Cesium.Viewer("map", {
+  globe: false, baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false,
+  animation: false, timeline: false, fullscreenButton: false, infoBox: false, selectionIndicator: false, baseLayer: false,
+  creditContainer: document.getElementById("gcredit"), requestRenderMode: false,
+  contextOptions: { webgl: { preserveDrawingBuffer: true, alpha: false } },
+});
+const scene = viewer.scene, cam = viewer.camera;
+scene.skyAtmosphere.show = true; scene.fog.enabled = true; scene.fog.density = 1.2e-4;
+viewer.clock.currentTime = Cesium.JulianDate.fromIso8601("2026-01-15T13:10:00Z");    // ~17:10 Dubai: low golden sun
+viewer.clock.shouldAnimate = false;
+// Match MapLibre's framing: its vertical FOV is 36.87 deg; Cesium's fov is the wider (horizontal) angle.
+cam.frustum.fov = 2 * Math.atan(Math.tan(18.435 * D2R) * window.innerWidth / window.innerHeight);
+// Warm cinematic grade over the photoreal city.
+scene.postProcessStages.add(new Cesium.PostProcessStage({ fragmentShader: `
+  uniform sampler2D colorTexture; in vec2 v_textureCoordinates;
+  void main() { vec3 c = texture(colorTexture, v_textureCoordinates).rgb;
+    c = pow(c, vec3(0.96)); c = (c - 0.5) * 1.07 + 0.5; c *= vec3(1.045, 1.0, 0.94);
+    float l = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(l), c, 1.12);
+    vec2 q = v_textureCoordinates - 0.5; c *= 1.0 - 0.32 * dot(q, q);
+    out_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0); }` }));
+let tileset = null, GROUND = -20;                                                 // ellipsoid height of the streets (refined from tiles)
+(async () => {
+  tileset = await Cesium.createGooglePhotorealistic3DTileset(window.GKEY, { maximumScreenSpaceError: 10, showCreditsOnScreen: true });
+  scene.primitives.add(tileset);
+  window.ready3d = true;
+})();
+
+const points = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const glow = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const trails = scene.primitives.add(new Cesium.PolylineCollection());
+const C = h => Cesium.Color.fromCssColorString(h);
+const NOCLIP = Number.POSITIVE_INFINITY;
+const taxiPts = R.taxis.map((_, i) => points.add({ pixelSize: i === HERO ? 16 : 7, color: C(COL[0]), outlineColor: C("#000000").withAlpha(0.7),
+  outlineWidth: i === HERO ? 3 : 1.2, disableDepthTestDistance: NOCLIP, scaleByDistance: new Cesium.NearFarScalar(400, 1.8, 25000, 0.55) }));
+const taxiGlow = R.taxis.map((_, i) => glow.add({ pixelSize: i === HERO ? 46 : 20, color: C(COL[0]).withAlpha(0.28),
+  disableDepthTestDistance: NOCLIP, scaleByDistance: new Cesium.NearFarScalar(400, 1.6, 25000, 0.5) }));
+const riderPts = []; for (let k = 0; k < 160; k++) riderPts.push(points.add({ show: false, pixelSize: 9, color: C("#ffffff"), outlineColor: C("#c0392b"),
+  outlineWidth: 2.5, disableDepthTestDistance: NOCLIP, scaleByDistance: new Cesium.NearFarScalar(400, 1.7, 25000, 0.6) }));
+const P = (lon, lat, h = 0) => Cesium.Cartesian3.fromDegrees(lon, lat, GROUND + h);
+
+let zonePrims = [], moveEnts = [], tripEnts = [];
+function setZones(d, show) {
+  for (const p of zonePrims) scene.primitives.remove(p);
+  zonePrims = [];
+  if (!d || !show) return;
+  R.zones.forEach((pts, z) => {
+    if (seaZone(z)) return;
+    const g = Math.max(-1, Math.min(1, gapOf(d, z) / 5));
+    const col = (g > 0 ? C("#e63c3c") : C("#3c6ee6")).withAlpha(0.18 + 0.32 * Math.abs(g));
+    const inst = new Cesium.GeometryInstance({ geometry: new Cesium.PolygonGeometry({
+        polygonHierarchy: new Cesium.PolygonHierarchy(pts.map(q => { const [lo, la] = ll(q); return Cesium.Cartesian3.fromDegrees(lo, la, -200); })),
+        height: -200, extrudedHeight: 900 }),
+      attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(col) } });
+    // One primitive per zone: a ClassificationPrimitive allows a single colour across its instances.
+    zonePrims.push(scene.primitives.add(new Cesium.ClassificationPrimitive({ geometryInstances: inst, asynchronous: false,
+      classificationType: Cesium.ClassificationType.CESIUM_3D_TILE })));
+  });
+}
+function setMoves(d, mode) {
+  for (const e of moveEnts) viewer.entities.remove(e);
+  moveEnts = [];
+  if (!d || !mode) return;
+  for (const [i, j, n] of d.moves) {
+    const isHero = d.taxis.some(m => m[0] === HERO && m[1] === i && m[2] === j);
+    if (mode === 2 && !isHero) continue;
+    const [ax, ay] = ll(R.centres[i]), [bx, by] = ll(R.centres[j]);
+    const arc = [0, 0.25, 0.5, 0.75, 1].map(f => P(lerp(ax, bx, f), lerp(ay, by, f), 120 + 420 * Math.sin(Math.PI * f)));
+    moveEnts.push(viewer.entities.add({ polyline: { positions: arc, width: 14 + 3 * Math.min(n, 6), arcType: Cesium.ArcType.NONE,
+      material: new Cesium.PolylineArrowMaterialProperty(isHero ? C("#ffc400") : C("#b06cff")) } }));
+  }
+}
+function setTrip(t, others) {
+  for (const e of tripEnts) viewer.entities.remove(e);
+  tripEnts = [];
+  const add = (i, w) => {
+    const tg = targetAt(i, t), p = taxiAt(i, t); if (!tg || !p) return;
+    if (tg[2] === 2 && i !== HERO) return;
+    const [qx, qy] = ll([tg[3], tg[4]]);
+    tripEnts.push(viewer.entities.add({ polyline: { positions: [P(p.lon, p.lat, 4), P(qx, qy, 4)], width: w, arcType: Cesium.ArcType.NONE,
+      material: new Cesium.PolylineDashMaterialProperty({ color: C(tg[2] === 1 ? "#ff9f1a" : tg[2] === 2 ? "#ff4d4d" : "#5aa2ff"), dashLength: 18 }),
+      depthFailMaterial: new Cesium.PolylineDashMaterialProperty({ color: C(tg[2] === 1 ? "#ff9f1a" : "#ff4d4d").withAlpha(0.7), dashLength: 18 }) } }));
+  };
+  if (others) R.taxis.forEach((_, i) => i !== HERO && add(i, 2));
+  add(HERO, 5);
+}
+function updateFleet(t, name) {
+  const showHero = !["intro", "end", "overview"].includes(name);
+  R.taxis.forEach((_, i) => {
+    const p = taxiAt(i, t), pt = taxiPts[i], g = taxiGlow[i];
+    if (!p) { pt.show = g.show = false; return; }
+    const pos = P(p.lon, p.lat, i === HERO ? 3 : 2);
+    const col = i === HERO && showHero ? "#ffc400" : COL[p.state];
+    pt.position = g.position = pos; pt.show = g.show = name !== "intro";
+    pt.color = C(col); g.color = C(col).withAlpha(i === HERO && showHero ? 0.25 + 0.15 * Math.sin(t * 1.8) : 0.22);
+  });
+  const [k0] = frameAt(t);
+  riderPts.forEach((rp, k) => {
+    const q = R.riders[k0][k];
+    if (!q || name === "intro") { rp.show = false; return; }
+    const [lo, la] = ll(q); rp.show = true; rp.position = P(lo, la, 2);
+    rp.color = C(q[2] ? "#ffe14d" : "#ffffff"); rp.outlineColor = C(q[2] ? "#6b5800" : "#c0392b");
+  });
+  trails.removeAll();
+  if (name === "intro") return;
+  R.taxis.forEach((_, i) => {
+    const now = taxiAt(i, t); if (!now) return;
+    const pts = [];
+    for (let s = 60; s >= 0; s -= 4) { const p = taxiAt(i, Math.max(0, t - s)); if (p) pts.push(P(p.lon, p.lat, 2)); }
+    if (pts.length < 2) return;
+    const hero = i === HERO && showHero;
+    trails.add({ positions: pts, width: hero ? 10 : 5, material: Cesium.Material.fromType("PolylineGlow",
+      { color: C(hero ? "#ffd84d" : COL[now.state]).withAlpha(hero ? 0.95 : 0.7), glowPower: 0.25, taperPower: 0.6 }) });
+  });
+}
+// Same camera parameters as the MapLibre film: centre, web-mercator zoom, pitch from vertical, bearing.
+let CUR_Z = 12;
+function setCam(c) {
+  CUR_Z = c.z;
+  const mpp = 78271.52 * Math.cos(c.lat * D2R) / Math.pow(2, c.z);             // MapLibre zoom uses 512 px tiles
+  const range = (mpp * window.innerHeight / 2) / Math.tan(18.435 * D2R);
+  cam.lookAt(Cesium.Cartesian3.fromDegrees(c.lon, c.lat, GROUND),
+             new Cesium.HeadingPitchRange(c.bearing * D2R, -(90 - c.pitch) * D2R, range));
+  cam.lookAtTransform(Cesium.Matrix4.IDENTITY);
+}
+function refineGround(lon, lat) {                                                // street height under the camera target
+  const h = scene.sampleHeight ? scene.sampleHeight(Cesium.Cartographic.fromDegrees(lon, lat), [points, glow, trails]) : undefined;
+  if (h !== undefined && isFinite(h) && h > -80 && h < 80) GROUND = lerp(GROUND, h, 0.5);
+}
+
+// ------------------------------------------------------------------ the film
+const TL = Object.fromEntries((window.TIMELINE || []).map(s => [s.name, s]));
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const lerp = (a, b, f) => a + (b - a) * f, clamp01 = x => Math.max(0, Math.min(1, x));
+const lerpAng = (a, b, f) => a + (((b - a + 540) % 360) - 180) * f;
+const fade = (t, a, b, edge = 0.7) => clamp01(Math.min((t - a) / edge, (b - t) / edge));
+const DT = { lon: 55.2744, lat: 25.1972 }, AXIS = 312;                          // Downtown; bearing that lays the corridor left-right
+const CAP = {
+  overview: ["200 taxis on Dubai's real road network", "Simulated car by car in SUMO, on OpenStreetMap roads and buildings"],
+  forecast: ["AI forecasts demand every 5 minutes", "A graph neural network predicts riders per district. Red: more demand than taxis nearby"],
+  position: ["Idle taxis move ahead of the demand", "Robust optimisation + reinforcement learning choose the cheapest moves"],
+  heads: ["Taxi 1 heads toward the demand", "From Business Bay, before anyone has booked"],
+  match: ["07:09 · A rider near Downtown books", "The nearest free taxi is matched in under 30 seconds"],
+  pickup: ["Pickup in 2 min 15 s", "Through real junctions and traffic lights"],
+  ride: ["Passenger on board, heading to Al Garhoud", "The platform keeps rebalancing the other 199 taxis"],
+};
+const STEP = { forecast: "1 · FORECAST", position: "2 · POSITION", heads: "2 · POSITION", match: "3 · DISPATCH", pickup: "3 · DISPATCH", ride: "4 · RIDE" };
+// Each scene: sim-time range, camera start/end ({lon,lat,z,pitch,bearing} or "chase"/"mid"), layer switches.
+const SCN = {
+  intro:    { sim: [0, 25], cam: [{ ...DT, z: 15.6, pitch: 66, bearing: 195 }, { ...DT, z: 15.2, pitch: 62, bearing: 245 }] },
+  overview: { sim: [25, 290], cam: [{ ...DT, z: 15.2, pitch: 62, bearing: 245 }, { lon: 55.245, lat: 25.17, z: 11.55, pitch: 42, bearing: AXIS }], dots: 1 },
+  forecast: { sim: [302, 345], cam: [{ lon: 55.245, lat: 25.17, z: 11.55, pitch: 42, bearing: AXIS }, { lon: 55.275, lat: 25.19, z: 12.5, pitch: 50, bearing: AXIS + 8 }], zones: 1, labels: 1 },
+  position: { sim: [345, 400], cam: [{ lon: 55.275, lat: 25.19, z: 12.5, pitch: 50, bearing: AXIS + 8 }, { lon: 55.283, lat: 25.188, z: 13.4, pitch: 56, bearing: AXIS + 18 }], zones: 1, moves: 1, labels: 1 },
+  heads:    { sim: [400, 560], cam: [{ lon: 55.283, lat: 25.188, z: 13.4, pitch: 56, bearing: AXIS + 18 }, "chase:18.2:66"], zones: 1, moves: 2, trips: 1 },
+  match:    { sim: [560, 600], cam: ["chase:18.2:66", "mid:16.9:60"], trips: 1 },
+  pickup:   { sim: [600, 712], cam: ["mid:16.9:60", "chase:18.8:72"], trips: 1 },
+  ride:     { sim: [712, 1040], cam: ["chase:18.8:72", "chase:15.4:58"], trips: 1, others: 1 },
+  results:  { sim: [1040, 1600], cam: [{ lon: 55.27, lat: 25.19, z: 12.3, pitch: 50, bearing: AXIS }, { lon: 55.26, lat: 25.18, z: 11.9, pitch: 46, bearing: AXIS - 12 }], zones: 1, moves: 1 },
+  end:      { sim: [1600, 1700], cam: [{ ...DT, z: 14.8, pitch: 64, bearing: 120 }, { ...DT, z: 15.3, pitch: 66, bearing: 165 }] },
+};
+function camAt(k, t) {
+  if (typeof k !== "string") return k;
+  const [kind, z, pitch] = k.split(":"), p = taxiAt(HERO, t);
+  if (kind === "chase") {
+    const b = smoothHeading(HERO, t), back = 0;                                  // look along the direction of travel
+    return { lon: p.lon, lat: p.lat, z: +z, pitch: +pitch, bearing: b };
+  }
+  const tg = targetAt(HERO, t), q = tg ? ll([tg[3], tg[4]]) : [p.lon, p.lat];
+  return { lon: (p.lon + q[0]) / 2, lat: (p.lat + q[1]) / 2, z: +z, pitch: +pitch, bearing: smoothHeading(HERO, t) };
+}
+let lastDecisionKey = null;
+window.frame3d = async f => {
+  const t = f / FPS;
+  const name = Object.keys(SCN).find(n => TL[n] && t >= TL[n].start && t < TL[n].end) || "end";
+  const S = SCN[name], tl = TL[name], u = clamp01((t - tl.start) / (tl.end - tl.start)), e = ease(u);
+  const simT = lerp(S.sim[0], S.sim[1], u);
+  const a = camAt(S.cam[0], simT), b = camAt(S.cam[1], simT);
+  const c = { lon: lerp(a.lon, b.lon, e), lat: lerp(a.lat, b.lat, e), z: lerp(a.z, b.z, e), pitch: lerp(a.pitch, b.pitch, e), bearing: lerpAng(a.bearing, b.bearing, e) };
+  setCam(c);
+  for (const zp of zonePrims) zp.show = c.z < 14.0;                              // no ground tint at street level
+  updateFleet(simT, name);
+  setTrip(simT, S.others && S.trips ? 1 : 0); if (!S.trips) { for (const x of tripEnts) viewer.entities.remove(x); tripEnts = []; }
+  const d = decisionAt(simT), key = `${name}|${d ? d.t : -1}`;
+  if (key !== lastDecisionKey) { lastDecisionKey = key; setZones(d, !!S.zones); setMoves(S.moves ? d : null, S.moves); }
+  for (const zp of zonePrims) zp.show = c.z < 14.0;
+  // Render until the photoreal tiles for this view are in (or give up after ~25 s).
+  let stable = 0;
+  for (let k = 0; k < 250 && stable < 3; k++) {
+    scene.render();
+    if (k === 2) refineGround(c.lon, c.lat);
+    await new Promise(r => setTimeout(r, k < 3 ? 15 : 100));
+    stable = tileset && tileset.tilesLoaded ? stable + 1 : 0;
+  }
+  setCam(c); scene.render();
+  overlays(t, name, tl, S, simT, d);
+};
+function place(cls, lonlat, text, lift = 0) {
+  const w = Cesium.SceneTransforms.worldToWindowCoordinates(scene, P(lonlat[0], lonlat[1], 3));
+  if (!w) return;
+  const el = document.createElement("div"); el.className = cls; el.textContent = text;
+  el.style.left = w.x + "px"; el.style.top = (w.y - lift) + "px"; $("labels").appendChild(el);
+}
+function overlays(t, name, tl, S, simT, d) {
+  $("labels").innerHTML = "";
+  const z = CUR_Z;
+  if (S.labels) R.centres.forEach((c, k) => { if (!seaZone(k)) place("zl", ll(c), R.names[k]); });
+  const p = taxiAt(HERO, simT);
+  if (!["intro", "end", "overview", "results"].includes(name) && p) {
+    place("tag hero", [p.lon, p.lat], "TAXI 1", z > 15 ? 34 : 14);
+    const tg = targetAt(HERO, simT);
+    if (tg && tg[2] === 1) place("tag rider", ll([tg[3], tg[4]]), "RIDER", 16);
+    if (tg && tg[2] === 2) place("tag drop", ll([tg[3], tg[4]]), "DROP-OFF", 8);
+  }
+  $("dClock").textContent = clock(simT);
+  $("dTag").textContent = STEP[name] || "";
+  $("dStep").textContent = STEP[name] || ""; $("dStep").style.opacity = STEP[name] ? fade(t, tl.start, tl.end) : 0;
+  const tt = $("dTitle");
+  if (name === "intro") {
+    tt.innerHTML = `<div class="kicker">AI-DRIVEN FLEET MANAGEMENT</div><h1>Every taxi in the right place,<br>before the rider asks.</h1><p>Forecast demand · Position the fleet · Dispatch in seconds</p>`;
+    tt.style.opacity = fade(t, tl.start + 0.8, tl.end - 0.3, 1.0);
+  } else if (name === "end") {
+    tt.innerHTML = `<div class="kicker">DUBAI AI TAXI FLEET</div><h1>Forecast. Position. Dispatch.</h1><p>AI-driven fleet management for smarter cities · Graph neural networks · Robust optimisation · Reinforcement learning</p>`;
+    tt.style.opacity = fade(t, tl.start + 0.4, tl.end + 2, 1.0);
+  } else tt.style.opacity = 0;
+  const lw = $("dLower");
+  if (CAP[name]) { $("dH").textContent = CAP[name][0]; $("dS").textContent = CAP[name][1]; lw.style.opacity = fade(t, tl.start + 0.2, tl.end - 0.1);
+                   lw.style.transform = `translateX(${(1 - ease(clamp01((t - tl.start - 0.2) / 0.7))) * -50}px)`; }
+  else lw.style.opacity = 0;
+  const [k0] = frameAt(simT), [served, waiting, , req] = R.stats[k0];
+  $("dStats").innerHTML = `<div><b>${req}</b><span>requests</span></div><div><b>${served}</b><span>served</span></div><div><b>${waiting}</b><span>waiting</span></div>`;
+  $("dStats").style.opacity = CAP[name] ? fade(t, tl.start + 0.2, tl.end - 0.1) : 0;
+  const rs = $("dResults");
+  if (name === "results") {
+    const g = k => clamp01((t - tl.start - 0.5 - 0.45 * k) / 0.8), num = (v, k) => (v * ease(g(k))).toFixed(v % 1 ? 1 : 0);
+    rs.innerHTML = `<div class="rh">Same riders, same roads: AI rebalancing vs none</div><div class="cards">
+      <div class="card" style="opacity:${g(0)}"><b>−${num(13, 0)}%</b><span>average wait</span><small>4.5 vs 5.2 min</small></div>
+      <div class="card" style="opacity:${g(1)}"><b>${num(100, 1)}%</b><span>riders served</span><small>vs 99.5% with no rebalancing</small></div>
+      <div class="card" style="opacity:${g(2)}"><b>−${num(2, 2)} min</b><span>slowest 10% of waits</span><small>8.0 vs 10.0 min</small></div></div>
+      <div class="rf">SUMO on Dubai's OpenStreetMap roads · 07:00–08:00 · 200 taxis · 559 riders (scaled demand)</div>`;
+    rs.style.opacity = fade(t, tl.start, tl.end);
+  } else rs.style.opacity = 0;
+  const lb = ["heads", "match", "pickup", "ride"].includes(name) ? 1 : 0;           // cinematic bars for the street-level story
+  const lbH = 64 * (name === "heads" ? ease(u_(t, tl)) : lb);
+  $("lbT").style.height = lbH + "px"; $("lbB").style.height = lbH + "px";
+  document.querySelector(".brand").style.top = (44 + lbH) + "px"; document.querySelector(".clockchip").style.top = (36 + lbH) + "px";
+  for (const id of ["dLower", "dStats"]) $(id).style.bottom = (78 + lbH * 0.6) + "px";
+  $("dStep").style.bottom = (214 + lbH * 0.6) + "px";
+}
+const u_ = (t, tl) => clamp01((t - tl.start) / 1.2);
+window.info3d = () => ({ fps: FPS, frames: Math.round(Math.max(...(window.TIMELINE || []).map(s => s.end)) * FPS) });
+</script>
+</body>
+</html>

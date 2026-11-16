@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dubai AI Taxi 3D</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #05080c; overflow: hidden; }
+  #map { position: absolute; inset: 0; }
+  #dir { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: Montserrat, system-ui, sans-serif; color: #fff; }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,.35) 100%),
+              linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0) 28%), linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,0) 14%); }
+  .letterbox { position: absolute; left: 0; right: 0; height: 0; background: #000; }
+  .lb-top { top: 0; } .lb-bot { bottom: 0; }
+  .brand { position: absolute; left: 56px; top: 44px; font-weight: 800; letter-spacing: .2em; font-size: 20px; display: flex; align-items: center; gap: 12px; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  .brand .dot { width: 14px; height: 14px; border-radius: 50%; background: #ffc400; box-shadow: 0 0 0 5px rgba(255,196,0,.25); }
+  .clockchip { position: absolute; right: 56px; top: 36px; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  .clockchip span { font-weight: 800; font-size: 42px; font-variant-numeric: tabular-nums; }
+  .clockchip small { display: block; font-weight: 600; font-size: 15px; letter-spacing: .22em; color: #ffc400; }
+  .title { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+           background: radial-gradient(ellipse 60% 45% at center, rgba(4,8,12,.62), rgba(4,8,12,0) 100%); }
+  .title .kicker { color: #ffc400; font-weight: 600; letter-spacing: .38em; font-size: 19px; margin-bottom: 20px; text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+  .title h1 { margin: 0; font-size: 70px; line-height: 1.1; font-weight: 800; text-shadow: 0 6px 30px rgba(0,0,0,.75); }
+  .title p { margin: 24px 0 0; font-size: 23px; color: #eef2f6; text-shadow: 0 2px 14px rgba(0,0,0,.85); max-width: 1150px; }
+  .lower { position: absolute; left: 56px; bottom: 78px; display: flex; gap: 18px; max-width: 1080px;
+           background: linear-gradient(90deg, rgba(8,12,18,.86), rgba(8,12,18,.62)); padding: 18px 28px 18px 18px; border-radius: 6px; }
+  .lower .bar { width: 6px; border-radius: 3px; background: #ffc400; flex: none; }
+  .lower .h { font-size: 33px; font-weight: 800; line-height: 1.2; }
+  .lower .s { font-size: 19px; color: #d9e0e7; margin-top: 6px; line-height: 1.4; }
+  .step { position: absolute; left: 56px; bottom: 214px; font-weight: 800; font-size: 15px; letter-spacing: .25em; color: #111; background: #ffc400; padding: 6px 12px; border-radius: 4px; }
+  .stats { position: absolute; right: 56px; bottom: 78px; display: flex; gap: 14px; }
+  .stats div { background: rgba(8,12,18,.78); border-radius: 6px; padding: 12px 18px; text-align: center; min-width: 124px; }
+  .stats b { display: block; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #b5c0cb; }
+  .results { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(4,8,12,.42); }
+  .results .rh { font-size: 32px; font-weight: 800; margin-bottom: 36px; text-shadow: 0 3px 18px rgba(0,0,0,.6); }
+  .results .cards { display: flex; gap: 30px; }
+  .results .card { width: 340px; background: rgba(10,15,22,.86); border-top: 5px solid #ffc400; border-radius: 8px; padding: 30px 24px; text-align: center; }
+  .results .card b { display: block; font-size: 72px; font-weight: 800; color: #ffc400; font-variant-numeric: tabular-nums; }
+  .results .card span { display: block; font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .results .card small { display: block; font-size: 16px; color: #b5c0cb; margin-top: 10px; }
+  .results .rf { margin-top: 30px; font-size: 16px; color: #cfd7de; }
+  .credit { position: absolute; right: 56px; bottom: 30px; font-size: 13px; color: rgba(255,255,255,.75); }
+  .tag { position: absolute; transform: translate(-50%, -100%); font: 800 16px Montserrat, sans-serif; padding: 5px 11px; border-radius: 5px; white-space: nowrap;
+         box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  .tag::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: inherit; }
+  .tag.hero { background: #ffc400; color: #111; border-top-color: #ffc400; }
+  .tag.rider { background: #ffe14d; color: #111; border-top-color: #ffe14d; }
+  .tag.drop { background: #e03b3b; color: #fff; border-top-color: #e03b3b; }
+  .zl { position: absolute; transform: translate(-50%, -50%); font: 600 13px Montserrat, sans-serif; color: #fff; background: rgba(8,12,18,.6); padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+  .maplibregl-ctrl-attrib { display: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="dir">
+  <div class="vignette"></div>
+  <div id="labels"></div>
+  <div class="brand"><span class="dot"></span>DUBAI AI TAXI FLEET</div>
+  <div class="clockchip"><span id="dClock">07:00</span><small id="dTag"></small></div>
+  <div class="step" id="dStep"></div>
+  <div class="title" id="dTitle"></div>
+  <div class="lower" id="dLower"><div class="bar"></div><div><div class="h" id="dH"></div><div class="s" id="dS"></div></div></div>
+  <div class="stats" id="dStats"></div>
+  <div class="results" id="dResults"></div>
+  <div class="credit">Simulation: SUMO on OpenStreetMap roads &amp; buildings · Imagery © Esri, Maxar, Earthstar Geographics</div>
+  <div class="letterbox lb-top" id="lbT"></div><div class="letterbox lb-bot" id="lbB"></div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="replay_residual_rl.js"></script>
+<script src="timeline.js"></script>
+<script>
+// ------------------------------------------------------------------ data helpers (same replay format as the viewer)
+const R = window.REPLAY.residual_rl, FPS = 30, HERO = R.taxis.indexOf("taxi1");
+const COL = ["#2ecc71", "#ff9f1a", "#ff3b3b", "#3d8bff"];
+const $ = id => document.getElementById(id);
+const ll = q => [R.lon0 + q[1] / 1e5, R.lat0 + q[0] / 1e5];                     // [lon, lat]
+const clock = t => { const m = Math.floor(R.clock0 + t / 60); return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+function frameAt(t) {
+  let lo = 0, hi = R.times.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (R.times[mid] <= t) lo = mid; else hi = mid - 1; }
+  const k1 = Math.min(lo + 1, R.times.length - 1), span = R.times[k1] - R.times[lo];
+  return [lo, k1, span > 0 ? Math.min(1, Math.max(0, (t - R.times[lo]) / span)) : 0];
+}
+function taxiAt(i, t) {
+  const [k0, k1, f] = frameAt(t), a = R.pos[k0][i], b = R.pos[k1][i] || a;
+  if (!a) return null;
+  const d = ((b[2] - a[2] + 540) % 360) - 180;
+  return { lon: R.lon0 + (a[1] + (b[1] - a[1]) * f) / 1e5, lat: R.lat0 + (a[0] + (b[0] - a[0]) * f) / 1e5, ang: a[2] + d * f, state: R.state[k0][i] };
+}
+const evIdx = R.taxis.map(() => []); for (const e of R.events) evIdx[e[1]].push(e);
+function targetAt(i, t) { let best = null; for (const e of evIdx[i]) { if (e[0] <= t) best = e; else break; } return best && best[2] ? best : null; }
+function decisionAt(t) { let d = null; for (const x of R.decisions) if (x.t <= t) d = x; return d; }
+function smoothHeading(i, t) {                                                   // chase-cam bearing: direction of travel over ±7 s
+  const a = taxiAt(i, t - 7), b = taxiAt(i, t + 7);
+  if (!a || !b) return taxiAt(i, t).ang;
+  const dx = (b.lon - a.lon) * Math.cos(25.2 * Math.PI / 180), dy = b.lat - a.lat;
+  return Math.hypot(dx, dy) < 2e-5 ? taxiAt(i, t).ang : (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+}
+const gapOf = (d, z) => d.hi[z] + d.queue[z] - d.idle[z] - d.arriving[z];
+const seaZone = z => R.names[z].startsWith("Coast") || (z >= 30 && R.names[z].startsWith("near"));
+
+// ------------------------------------------------------------------ geometry builders
+const M_LAT = 111320, M_LON = 111320 * Math.cos(25.2 * Math.PI / 180);
+function carPoly(lon, lat, ang, L, W) {                                          // rectangle L x W metres, heading ang
+  const r = ang * Math.PI / 180, ux = Math.sin(r), uy = Math.cos(r), vx = uy, vy = -ux;
+  const pts = [[L / 2, W / 2], [L / 2, -W / 2], [-L / 2, -W / 2], [-L / 2, W / 2]].map(([a, b]) =>
+    [lon + (a * ux + b * vx) / M_LON, lat + (a * uy + b * vy) / M_LAT]);
+  return [[...pts, pts[0]]];
+}
+const fc = feats => ({ type: "FeatureCollection", features: feats });
+let CAR_K = 1;                                                                     // set per frame from the zoom
+function fleetData(t) {
+  const cars = [], dots = [], k = CAR_K;
+  R.taxis.forEach((_, i) => {
+    const p = taxiAt(i, t); if (!p) return;
+    const hero = i === HERO;
+    cars.push({ type: "Feature", properties: { c: hero ? "#ffc400" : COL[p.state], h: (hero ? 2.4 : 1.6) * Math.min(k, 2.5) },
+                geometry: { type: "Polygon", coordinates: carPoly(p.lon, p.lat, p.ang, (hero ? 6.4 : 4.8) * k, (hero ? 2.6 : 2.0) * k) } });
+    if (hero) cars.push({ type: "Feature", properties: { c: "#1b2733", h: 2.9 * Math.min(k, 2.5) },                       // roof light block
+                geometry: { type: "Polygon", coordinates: carPoly(p.lon, p.lat, p.ang, 1.4 * k, 1.6 * k) } });
+    dots.push({ type: "Feature", properties: { c: COL[p.state], r: hero ? 1 : 0 }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } });
+  });
+  const [k0] = frameAt(t);
+  const riders = R.riders[k0].map(q => ({ type: "Feature", properties: { c: q[2] ? "#ffe14d" : "#ffffff" }, geometry: { type: "Point", coordinates: ll(q) } }));
+  return { cars: fc(cars), dots: fc(dots), riders: fc(riders) };
+}
+function trailData(t) {                                                           // light trails: last 60 sim-s, three fading segments
+  const feats = [], SEG = [[60, 40, 0.18], [40, 20, 0.45], [20, 0, 0.9]];
+  R.taxis.forEach((_, i) => {
+    const now = taxiAt(i, t); if (!now) return;
+    const col = i === HERO ? "#ffd84d" : COL[now.state];
+    for (const [a, b, o] of SEG) {
+      const pts = [];
+      for (let s = a; s >= b; s -= 4) { const p = taxiAt(i, Math.max(0, t - s)); if (p) pts.push([p.lon, p.lat]); }
+      if (pts.length > 1) feats.push({ type: "Feature", properties: { col, o }, geometry: { type: "LineString", coordinates: pts } });
+    }
+  });
+  return fc(feats);
+}
+// Day -> blue hour -> night grading: n in [0, 1].
+const hexMix = (a, b, f) => "#" + [1, 3, 5].map(k => Math.round(lerp(parseInt(a.slice(k, k + 2), 16), parseInt(b.slice(k, k + 2), 16), f))
+                                   .toString(16).padStart(2, "0")).join("");
+function applyTheme(n) {
+  map.setPaintProperty("sat", "raster-brightness-max", lerp(0.97, 0.34, n));
+  map.setPaintProperty("sat", "raster-saturation", lerp(0.08, -0.45, n));
+  map.setPaintProperty("sat", "raster-contrast", lerp(0.08, 0.22, n));
+  map.setPaintProperty("sat", "raster-hue-rotate", lerp(0, 12, n));
+  map.setPaintProperty("bld", "fill-extrusion-color", ["interpolate", ["linear"], ["get", "h"],
+    0, hexMix("#d9cdb9", "#2c3a52", n), 30, hexMix("#e2dccf", "#34486a", n), 120, hexMix("#dfe6ed", "#4f6f9e", n), 400, hexMix("#eef3f8", "#9cc0ee", n)]);
+  map.setLight({ anchor: "map", position: [1.4, 215, lerp(35, 70, n)], color: hexMix("#fff3e0", "#b9d0ff", n), intensity: lerp(0.45, 0.4, n) });
+  map.setSky({ "sky-color": hexMix("#6ea8d8", "#0c1834", n), "horizon-color": hexMix("#f2dfc0", "#ff9a5a", Math.min(1, n * 1.3)),
+               "fog-color": hexMix("#e9dcc7", "#1a2238", n), "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7, "fog-ground-blend": lerp(0.25, 0.5, n),
+               "atmosphere-blend": 0.8 });
+  map.setPaintProperty("roads-glow", "line-opacity", 0.55 * n);
+  map.setPaintProperty("roads-core", "line-opacity", 0.75 * n);
+  map.setPaintProperty("dots-glow", "circle-opacity", 0.55 * n);
+  map.setPaintProperty("trails", "line-opacity", ["*", Math.max(0.25, n), ["get", "o"]]);
+  map.setPaintProperty("trails-glow", "line-opacity", ["*", 0.4 * n, ["get", "o"]]);
+}
+function tripData(t, all) {
+  const lines = [];
+  const add = (i, w) => {
+    const tg = targetAt(i, t), p = taxiAt(i, t); if (!tg || !p) return;
+    if (tg[2] === 2 && i !== HERO) return;
+    lines.push({ type: "Feature", properties: { k: tg[2], w }, geometry: { type: "LineString", coordinates: [[p.lon, p.lat], ll([tg[3], tg[4]])] } });
+  };
+  if (all) R.taxis.forEach((_, i) => i !== HERO && add(i, 1.5));
+  add(HERO, 4);
+  return fc(lines);
+}
+function zoneData(d, show) {
+  return fc(R.zones.map((pts, z) => {
+    const g = d ? Math.max(-1, Math.min(1, gapOf(d, z) / 5)) : 0;
+    return { type: "Feature", properties: { c: g > 0 ? "#e63c3c" : "#3c6ee6", o: show && d && !seaZone(z) ? 0.12 + 0.34 * Math.abs(g) : 0 },
+             geometry: { type: "Polygon", coordinates: [[...pts.map(ll), ll(pts[0])]] } };
+  }));
+}
+function moveData(d, onlyHero) {
+  const feats = [];
+  if (!d) return fc(feats);
+  for (const [i, j, n] of d.moves) {
+    const isHero = d.taxis.some(m => m[0] === HERO && m[1] === i && m[2] === j);
+    if (onlyHero && !isHero) continue;
+    const a = ll(R.centres[i]), b = ll(R.centres[j]);
+    const ang = Math.atan2((b[1] - a[1]) * M_LAT, (b[0] - a[0]) * M_LON), h = 650;
+    const wing = s => [b[0] - h * Math.cos(ang + s) / M_LON, b[1] - h * Math.sin(ang + s) / M_LAT];
+    feats.push({ type: "Feature", properties: { w: 3 + 2 * Math.min(n, 6), hero: isHero ? 1 : 0 }, geometry: { type: "LineString", coordinates: [a, b] } });
+    feats.push({ type: "Feature", properties: { w: 3 + 2 * Math.min(n, 6), hero: isHero ? 1 : 0 }, geometry: { type: "LineString", coordinates: [wing(0.45), b, wing(-0.45)] } });
+  }
+  return fc(feats);
+}
+
+// ------------------------------------------------------------------ map
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const map = new maplibregl.Map({
+  container: "map", interactive: false, attributionControl: false, fadeDuration: 0, maxPitch: 85, antialias: true,
+  preserveDrawingBuffer: true, center: [55.274, 25.197], zoom: 15, pitch: 60, bearing: 200,
+  style: { version: 8, sources: { sat: { type: "raster", tiles: [ESRI], tileSize: 256, maxzoom: 19 } },
+           layers: [{ id: "bg", type: "background", paint: { "background-color": "#0d1218" } }, { id: "sat", type: "raster", source: "sat",
+                      paint: { "raster-saturation": 0.08, "raster-contrast": 0.08, "raster-brightness-max": 0.97 } }] },
+});
+const empty = fc([]);
+map.on("load", async () => {
+  map.setSky({ "sky-color": "#6ea8d8", "horizon-color": "#f2dfc0", "fog-color": "#e9dcc7", "sky-horizon-blend": 0.6,
+               "horizon-fog-blend": 0.7, "fog-ground-blend": 0.25, "atmosphere-blend": 0.8 });
+  map.setLight({ anchor: "map", position: [1.4, 215, 35], color: "#fff3e0", intensity: 0.45 });
+  for (const id of ["zones", "moves", "trips", "riders", "dots", "cars", "hero", "trails"]) map.addSource(id, { type: "geojson", data: empty });
+  map.addSource("bld", { type: "geojson", data: "buildings.geojson" });
+  map.addSource("roads", { type: "geojson", data: "roads.geojson" });
+  map.addLayer({ id: "zones", type: "fill", source: "zones", paint: { "fill-color": ["get", "c"], "fill-antialias": false,
+                 "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, ["get", "o"], 15.5, ["*", 0.12, ["get", "o"]]] } });
+  // Night: street lights. Motorways glow sodium-amber, other roads a soft cyan "digital twin" line.
+  const roadCol = ["match", ["get", "c"], 1, "#ffb347", 2, "#ffd28a", 3, "#7fd8ff", "#5fb8e8"];
+  map.addLayer({ id: "roads-glow", type: "line", source: "roads", layout: { "line-cap": "round", "line-join": "round" },
+                 paint: { "line-color": roadCol, "line-blur": ["interpolate", ["linear"], ["zoom"], 11, 3, 17, 10],
+                          "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "c"], 1, 4, 2, 2.5, 1.2], 17, ["match", ["get", "c"], 1, 30, 2, 20, 10]],
+                          "line-opacity": 0 } });
+  map.addLayer({ id: "roads-core", type: "line", source: "roads", layout: { "line-cap": "round", "line-join": "round" },
+                 paint: { "line-color": roadCol, "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 11, ["match", ["get", "c"], 1, 1.2, 2, 0.8, 0.4], 17, ["match", ["get", "c"], 1, 5, 2, 3.5, 2]],
+                          "line-opacity": 0 } });
+  map.addLayer({ id: "trails-glow", type: "line", source: "trails", layout: { "line-cap": "round", "line-join": "round" },
+                 paint: { "line-color": ["get", "col"], "line-opacity": ["*", 0.35, ["get", "o"]], "line-blur": 6,
+                          "line-width": ["interpolate", ["linear"], ["zoom"], 11, 5, 16, 14, 19, 26] } });
+  map.addLayer({ id: "trails", type: "line", source: "trails", layout: { "line-cap": "round", "line-join": "round" },
+                 paint: { "line-color": ["get", "col"], "line-opacity": ["get", "o"], "line-blur": 0.6,
+                          "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 16, 4, 19, 8] } });
+  map.addLayer({ id: "moves", type: "line", source: "moves", layout: { "line-cap": "round", "line-join": "round" },
+                 paint: { "line-color": ["case", ["==", ["get", "hero"], 1], "#ffc400", "#b06cff"], "line-width": ["get", "w"], "line-opacity": 0.95 } });
+  map.addLayer({ id: "trips", type: "line", source: "trips", layout: { "line-cap": "round" },
+                 paint: { "line-color": ["match", ["get", "k"], 1, "#ff9f1a", 2, "#ff4d4d", "#5aa2ff"], "line-width": ["get", "w"], "line-dasharray": [2, 1.5] } });
+  map.addLayer({ id: "bld", type: "fill-extrusion", source: "bld", minzoom: 12,
+                 paint: { "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": 0, "fill-extrusion-vertical-gradient": true,
+                          "fill-extrusion-color": ["interpolate", ["linear"], ["get", "h"], 0, "#d9cdb9", 30, "#e2dccf", 120, "#dfe6ed", 400, "#eef3f8"],
+                          "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0, 13, 0.88] } });
+  map.addLayer({ id: "riders-glow", type: "circle", source: "riders", paint: { "circle-color": "#ffe14d", "circle-blur": 1, "circle-opacity": 0.5,
+                 "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 6, 16, 16, 19, 30], "circle-pitch-alignment": "map" } });
+  map.addLayer({ id: "riders", type: "circle", source: "riders", paint: { "circle-color": ["get", "c"], "circle-stroke-color": "#c0392b",
+                 "circle-stroke-width": 2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2.5, 16, 6, 19, 10], "circle-pitch-alignment": "map" } });
+  map.addLayer({ id: "dots-glow", type: "circle", source: "dots", paint: { "circle-color": ["get", "c"], "circle-blur": 1, "circle-opacity": 0,
+                 "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 11, 16, 18, 19, 34] } });
+  map.addLayer({ id: "dots", type: "circle", source: "dots", paint: { "circle-color": ["get", "c"], "circle-stroke-color": "#000", "circle-stroke-width": 0.8,
+                 "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2.6, 13, 4, 15, 5], "circle-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 1, 15.6, 0],
+                 "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 14.8, 1, 15.6, 0] } });
+  map.addLayer({ id: "hero", type: "circle", source: "hero", paint: { "circle-color": "rgba(255,196,0,0.28)", "circle-stroke-color": "#ffc400",
+                 "circle-stroke-width": 3, "circle-radius": ["get", "r"], "circle-pitch-alignment": "viewport" } });
+  map.addLayer({ id: "cars", type: "fill-extrusion", source: "cars", minzoom: 14.5,
+                 paint: { "fill-extrusion-color": ["get", "c"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-base": 0.2,
+                          "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 14.5, 0, 15.4, 1] } });
+  window.ready3d = true;
+});
+
+// ------------------------------------------------------------------ the film
+const TL = Object.fromEntries((window.TIMELINE || []).map(s => [s.name, s]));
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const lerp = (a, b, f) => a + (b - a) * f, clamp01 = x => Math.max(0, Math.min(1, x));
+const lerpAng = (a, b, f) => a + (((b - a + 540) % 360) - 180) * f;
+const fade = (t, a, b, edge = 0.7) => clamp01(Math.min((t - a) / edge, (b - t) / edge));
+const DT = { lon: 55.2744, lat: 25.1972 }, AXIS = 312;                          // Downtown; bearing that lays the corridor left-right
+const CAP = {
+  overview: ["200 taxis on Dubai's real road network", "Simulated car by car in SUMO, on OpenStreetMap roads and buildings"],
+  forecast: ["AI forecasts demand every 5 minutes", "A graph neural network predicts riders per district. Red: more demand than taxis nearby"],
+  position: ["Idle taxis move ahead of the demand", "Robust optimisation + reinforcement learning choose the cheapest moves"],
+  heads: ["Taxi 1 heads toward the demand", "From Business Bay, before anyone has booked"],
+  match: ["07:09 · A rider near Downtown books", "The nearest free taxi is matched in under 30 seconds"],
+  pickup: ["Pickup in 2 min 15 s", "Through real junctions and traffic lights"],
+  ride: ["Passenger on board, heading to Al Garhoud", "The platform keeps rebalancing the other 199 taxis"],
+};
+const STEP = { forecast: "1 · FORECAST", position: "2 · POSITION", heads: "2 · POSITION", match: "3 · DISPATCH", pickup: "3 · DISPATCH", ride: "4 · RIDE" };
+// Each scene: sim-time range, camera start/end ({lon,lat,z,pitch,bearing} or "chase"/"mid"), layer switches.
+const SCN = {
+  intro:    { sim: [0, 25], cam: [{ ...DT, z: 15.6, pitch: 66, bearing: 195 }, { ...DT, z: 15.2, pitch: 62, bearing: 245 }] },
+  overview: { sim: [25, 290], cam: [{ ...DT, z: 15.2, pitch: 62, bearing: 245 }, { lon: 55.245, lat: 25.17, z: 11.55, pitch: 42, bearing: AXIS }], dots: 1 },
+  forecast: { sim: [302, 345], cam: [{ lon: 55.245, lat: 25.17, z: 11.55, pitch: 42, bearing: AXIS }, { lon: 55.275, lat: 25.19, z: 12.5, pitch: 50, bearing: AXIS + 8 }], zones: 1, labels: 1 },
+  position: { sim: [345, 400], cam: [{ lon: 55.275, lat: 25.19, z: 12.5, pitch: 50, bearing: AXIS + 8 }, { lon: 55.283, lat: 25.188, z: 13.4, pitch: 56, bearing: AXIS + 18 }], zones: 1, moves: 1, labels: 1 },
+  heads:    { sim: [400, 560], cam: [{ lon: 55.283, lat: 25.188, z: 13.4, pitch: 56, bearing: AXIS + 18 }, "chase:18.2:66"], zones: 1, moves: 2, trips: 1 },
+  match:    { sim: [560, 600], cam: ["chase:18.2:66", "mid:16.9:60"], trips: 1 },
+  pickup:   { sim: [600, 712], cam: ["mid:16.9:60", "chase:18.8:72"], trips: 1 },
+  ride:     { sim: [712, 1040], cam: ["chase:18.8:72", "chase:15.4:58"], trips: 1, others: 1 },
+  results:  { sim: [1040, 1600], cam: [{ lon: 55.27, lat: 25.19, z: 12.3, pitch: 50, bearing: AXIS }, { lon: 55.26, lat: 25.18, z: 11.9, pitch: 46, bearing: AXIS - 12 }], zones: 1, moves: 1 },
+  end:      { sim: [1600, 1700], cam: [{ ...DT, z: 14.8, pitch: 64, bearing: 120 }, { ...DT, z: 15.3, pitch: 66, bearing: 165 }] },
+};
+function camAt(k, t) {
+  if (typeof k !== "string") return k;
+  const [kind, z, pitch] = k.split(":"), p = taxiAt(HERO, t);
+  if (kind === "chase") {
+    const b = smoothHeading(HERO, t), back = 0;                                  // look along the direction of travel
+    return { lon: p.lon, lat: p.lat, z: +z, pitch: +pitch, bearing: b };
+  }
+  const tg = targetAt(HERO, t), q = tg ? ll([tg[3], tg[4]]) : [p.lon, p.lat];
+  return { lon: (p.lon + q[0]) / 2, lat: (p.lat + q[1]) / 2, z: +z, pitch: +pitch, bearing: smoothHeading(HERO, t) };
+}
+const NIGHT = { intro: [0.0, 0.55], overview: [0.55, 0.9], end: [0.9, 0.85] };
+let lastDecisionKey = null;
+window.frame3d = async f => {
+  const t = f / FPS;
+  const name = Object.keys(SCN).find(n => TL[n] && t >= TL[n].start && t < TL[n].end) || "end";
+  const S = SCN[name], tl = TL[name], u = clamp01((t - tl.start) / (tl.end - tl.start)), e = ease(u);
+  const simT = lerp(S.sim[0], S.sim[1], u);
+  const a = camAt(S.cam[0], simT), b = camAt(S.cam[1], simT);
+  map.jumpTo({ center: [lerp(a.lon, b.lon, e), lerp(a.lat, b.lat, e)], zoom: lerp(a.z, b.z, e), pitch: lerp(a.pitch, b.pitch, e), bearing: lerpAng(a.bearing, b.bearing, e) });
+  CAR_K = Math.max(1, Math.min(5, Math.pow(2, 18.6 - map.getZoom())));
+  const nr = NIGHT[name] || [0.9, 0.9];
+  applyTheme(lerp(nr[0], nr[1], u));
+  map.getSource("trails").setData(name === "intro" ? empty : trailData(simT));
+  const fl = fleetData(simT), hp = taxiAt(HERO, simT);
+  map.getSource("hero").setData(fc(hp && !["intro", "end", "overview"].includes(name) ?
+    [{ type: "Feature", properties: { r: 16 + 6 * (0.5 + 0.5 * Math.sin(simT * 1.8)) }, geometry: { type: "Point", coordinates: [hp.lon, hp.lat] } }] : []));
+  map.getSource("cars").setData(fl.cars); map.getSource("dots").setData(fl.dots); map.getSource("riders").setData(fl.riders);
+  map.getSource("trips").setData(S.trips ? tripData(simT, S.others) : empty);
+  const d = decisionAt(simT), key = `${name}|${d ? d.t : -1}`;
+  if (key !== lastDecisionKey) {
+    lastDecisionKey = key;
+    map.getSource("zones").setData(zoneData(d, !!S.zones));
+    map.getSource("moves").setData(S.moves ? moveData(d, S.moves === 2) : empty);
+  }
+  overlays(t, name, tl, S, simT, d);
+  await new Promise(res => { let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    map.once("idle", fin); map.triggerRepaint(); setTimeout(fin, 20000); });
+};
+function place(cls, lonlat, text, lift = 0) {
+  const p = map.project(lonlat); const el = document.createElement("div"); el.className = cls; el.textContent = text;
+  el.style.left = p.x + "px"; el.style.top = (p.y - lift) + "px"; $("labels").appendChild(el);
+}
+function overlays(t, name, tl, S, simT, d) {
+  $("labels").innerHTML = "";
+  const z = map.getZoom();
+  if (S.labels) R.centres.forEach((c, k) => { if (!seaZone(k)) place("zl", ll(c), R.names[k]); });
+  const p = taxiAt(HERO, simT);
+  if (!["intro", "end", "overview", "results"].includes(name) && p) {
+    place("tag hero", [p.lon, p.lat], "TAXI 1", z > 15 ? 34 : 14);
+    const tg = targetAt(HERO, simT);
+    if (tg && tg[2] === 1) place("tag rider", ll([tg[3], tg[4]]), "RIDER", 16);
+    if (tg && tg[2] === 2) place("tag drop", ll([tg[3], tg[4]]), "DROP-OFF", 8);
+  }
+  $("dClock").textContent = clock(simT);
+  $("dTag").textContent = STEP[name] || "";
+  $("dStep").textContent = STEP[name] || ""; $("dStep").style.opacity = STEP[name] ? fade(t, tl.start, tl.end) : 0;
+  const tt = $("dTitle");
+  if (name === "intro") {
+    tt.innerHTML = `<div class="kicker">AI-DRIVEN FLEET MANAGEMENT</div><h1>Every taxi in the right place,<br>before the rider asks.</h1><p>Forecast demand · Position the fleet · Dispatch in seconds</p>`;
+    tt.style.opacity = fade(t, tl.start + 0.8, tl.end - 0.3, 1.0);
+  } else if (name === "end") {
+    tt.innerHTML = `<div class="kicker">DUBAI AI TAXI FLEET</div><h1>Forecast. Position. Dispatch.</h1><p>AI-driven fleet management for smarter cities · Graph neural networks · Robust optimisation · Reinforcement learning</p>`;
+    tt.style.opacity = fade(t, tl.start + 0.4, tl.end + 2, 1.0);
+  } else tt.style.opacity = 0;
+  const lw = $("dLower");
+  if (CAP[name]) { $("dH").textContent = CAP[name][0]; $("dS").textContent = CAP[name][1]; lw.style.opacity = fade(t, tl.start + 0.2, tl.end - 0.1);
+                   lw.style.transform = `translateX(${(1 - ease(clamp01((t - tl.start - 0.2) / 0.7))) * -50}px)`; }
+  else lw.style.opacity = 0;
+  const [k0] = frameAt(simT), [served, waiting, , req] = R.stats[k0];
+  $("dStats").innerHTML = `<div><b>${req}</b><span>requests</span></div><div><b>${served}</b><span>served</span></div><div><b>${waiting}</b><span>waiting</span></div>`;
+  $("dStats").style.opacity = CAP[name] ? fade(t, tl.start + 0.2, tl.end - 0.1) : 0;
+  const rs = $("dResults");
+  if (name === "results") {
+    const g = k => clamp01((t - tl.start - 0.5 - 0.45 * k) / 0.8), num = (v, k) => (v * ease(g(k))).toFixed(v % 1 ? 1 : 0);
+    rs.innerHTML = `<div class="rh">Same riders, same roads: AI rebalancing vs none</div><div class="cards">
+      <div class="card" style="opacity:${g(0)}"><b>−${num(13, 0)}%</b><span>average wait</span><small>4.5 vs 5.2 min</small></div>
+      <div class="card" style="opacity:${g(1)}"><b>${num(100, 1)}%</b><span>riders served</span><small>vs 99.5% with no rebalancing</small></div>
+      <div class="card" style="opacity:${g(2)}"><b>−${num(2, 2)} min</b><span>slowest 10% of waits</span><small>8.0 vs 10.0 min</small></div></div>
+      <div class="rf">SUMO on Dubai's OpenStreetMap roads · 07:00–08:00 · 200 taxis · 559 riders (scaled demand)</div>`;
+    rs.style.opacity = fade(t, tl.start, tl.end);
+  } else rs.style.opacity = 0;
+  const lb = ["heads", "match", "pickup", "ride"].includes(name) ? 1 : 0;           // cinematic bars for the street-level story
+  const lbH = 64 * (name === "heads" ? ease(u_(t, tl)) : lb);
+  $("lbT").style.height = lbH + "px"; $("lbB").style.height = lbH + "px";
+  document.querySelector(".brand").style.top = (44 + lbH) + "px"; document.querySelector(".clockchip").style.top = (36 + lbH) + "px";
+  for (const id of ["dLower", "dStats"]) $(id).style.bottom = (78 + lbH * 0.6) + "px";
+  $("dStep").style.bottom = (214 + lbH * 0.6) + "px";
+}
+const u_ = (t, tl) => clamp01((t - tl.start) / 1.2);
+window.info3d = () => ({ fps: FPS, frames: Math.round(Math.max(...(window.TIMELINE || []).map(s => s.end)) * FPS) });
+</script>
+</body>
+</html>
